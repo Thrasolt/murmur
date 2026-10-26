@@ -1,0 +1,32 @@
+# SwiftPM and Xcode build output
+.build/
+.swiftpm/
+DerivedData/
+
+# macOS metadata and editor state
+.DS_Store
+*.xcuserstate
+*.xcuserdatad/
+
+# App bundles and local build products
+*.app/
+*.dSYM/
+*.ipa
+*.pkg
+*.zip
+
+# Local signing material and provisioning profiles
+*.p12
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+
+# Local logs and crash reports
+*.log
+*.crash
+
+# Keep private project instructions and working notes out of the public repo
+/AGENTS.md
+/INDEX.md
+/wiki/
