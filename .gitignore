@@ -26,7 +26,6 @@ DerivedData/
 *.log
 *.crash
 
-# Keep private project instructions and working notes out of the public repo
 /AGENTS.md
 /INDEX.md
 /wiki/
