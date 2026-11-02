@@ -20,6 +20,7 @@ final class MurmurModel: ObservableObject {
     @Published var polishText = true
     @Published private(set) var isModelReady = false
     @Published private(set) var isModelLoading = false
+    @Published private(set) var waveform = AudioLevelHistory()
 
     var onShowOverlay: (() -> Void)?
     var onHideOverlay: (() -> Void)?
@@ -27,7 +28,8 @@ final class MurmurModel: ObservableObject {
     private let recorder = AudioRecorder()
     private let recognizer = LocalSpeechRecognizer()
     private let hotkey = GlobalHotkey()
-    private var targetApplication: NSRunningApplication?
+    private var insertionFocus: InsertionFocus<ApplicationFocusAccess>?
+    private var isInserting = false
     private var hotkeyError: String?
     private var hotkeyRegistered = false
     private var pendingStartID: UUID?
@@ -39,6 +41,10 @@ final class MurmurModel: ObservableObject {
     var menuTitle: String { isRecording ? "Aufnahme" : "Murmur" }
 
     init() {
+        recorder.onPowerChanged = { [weak self] power in
+            guard let self, self.isRecording else { return }
+            self.waveform.append(power: power)
+        }
         hotkey.onPress = { [weak self] in
             self?.pushToTalkPressed()
         }
@@ -111,7 +117,10 @@ final class MurmurModel: ObservableObject {
     private func startRecording(fromPushToTalk: Bool) {
         guard state != .starting, state != .recording, state != .processing, !isModelLoading else { return }
         transcript = ""
-        targetApplication = NSWorkspace.shared.frontmostApplication
+        waveform.reset()
+        insertionFocus = NSWorkspace.shared.frontmostApplication.map {
+            InsertionFocus(access: ApplicationFocusAccess(application: $0))
+        }
         let startID = UUID()
         pendingStartID = startID
         recordingStartedByPushToTalk = fromPushToTalk
@@ -162,6 +171,7 @@ final class MurmurModel: ObservableObject {
         guard state == .recording else { return }
         recordingStartedByPushToTalk = false
         stopAfterMicrophoneStarts = false
+        waveform.reset()
         state = .processing
         Task {
             do {
@@ -192,6 +202,7 @@ final class MurmurModel: ObservableObject {
         stopAfterMicrophoneStarts = false
         shortcutIsDown = false
         recorder.cancel()
+        waveform.reset()
         transcript = ""
         state = idleState
         onHideOverlay?()
@@ -203,21 +214,34 @@ final class MurmurModel: ObservableObject {
     }
 
     func retryInsert() {
+        guard state != .processing, !isInserting else { return }
+        state = .processing
         Task {
             let inserted = await insertIntoPreviousApp(transcript)
             if inserted {
                 state = idleState
                 onHideOverlay?()
+            } else {
+                state = .preview
+                onShowOverlay?()
             }
         }
     }
 
     private func insertIntoPreviousApp(_ text: String) async -> Bool {
-        guard let targetApplication, targetApplication.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+        guard !isInserting, let insertionFocus,
+              insertionFocus.access.application.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             return false
         }
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         guard AXIsProcessTrustedWithOptions(options) else { return false }
+        isInserting = true
+        defer { isInserting = false }
+
+        // A nonactivating panel can still own keyboard focus through its TextEditor.
+        // Remove it before restoring the browser's original field and sending ⌘V.
+        onHideOverlay?()
+        guard await insertionFocus.restore() else { return false }
 
         let pasteboard = NSPasteboard.general
         let previous = pasteboard.pasteboardItems?.compactMap { item -> [NSPasteboard.PasteboardType: Data]? in
@@ -228,8 +252,7 @@ final class MurmurModel: ObservableObject {
             return values.isEmpty ? nil : values
         } ?? []
 
-        targetApplication.activate()
-        try? await Task.sleep(for: .milliseconds(250))
+        guard insertionFocus.isReady else { return false }
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         if let source = CGEventSource(stateID: .combinedSessionState),
@@ -237,14 +260,19 @@ final class MurmurModel: ObservableObject {
            let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) {
             down.flags = .maskCommand
             up.flags = .maskCommand
-            down.post(tap: .cghidEventTap)
-            up.post(tap: .cghidEventTap)
+            let pid = insertionFocus.access.application.processIdentifier
+            down.postToPid(pid)
+            up.postToPid(pid)
         } else {
             restorePasteboard(previous, pasteboard: pasteboard)
             return false
         }
+        let insertionChangeCount = pasteboard.changeCount
         try? await Task.sleep(for: .milliseconds(700))
-        restorePasteboard(previous, pasteboard: pasteboard)
+        // Do not discard something the user copied while the destination was pasting.
+        if pasteboard.changeCount == insertionChangeCount {
+            restorePasteboard(previous, pasteboard: pasteboard)
+        }
         return true
     }
 

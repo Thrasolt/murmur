@@ -21,11 +21,25 @@ struct MenuContent: View {
                 modelSetup
             }
 
-            if !model.transcript.isEmpty {
+            if model.state != .processing, !model.transcript.isEmpty {
                 transcriptCard
             }
 
             footer
+
+            HStack {
+                Spacer()
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    Label("Murmur beenden", systemImage: "power")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(MurmurStyle.muted)
+                .keyboardShortcut("q", modifiers: .command)
+                .help("Murmur beenden (⌘Q)")
+            }
         }
         .padding(20)
         .frame(width: 382)
@@ -89,7 +103,7 @@ struct MenuContent: View {
 
     private var hero: some View {
         VStack(spacing: 14) {
-            WaveformView(isActive: model.isRecording || model.state == .starting)
+            WaveformView(levels: model.waveform.levels, isActive: model.isRecording)
                 .frame(height: 42)
 
             VStack(spacing: 5) {
@@ -266,7 +280,7 @@ struct OverlayContent: View {
             }
             .font(.system(size: 9, weight: .bold, design: .rounded))
 
-            WaveformView(isActive: model.isRecording || model.state == .starting)
+            WaveformView(levels: model.waveform.levels, isActive: model.isRecording)
                 .frame(height: 36)
 
             Text(overlayTitle)
@@ -274,7 +288,7 @@ struct OverlayContent: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white)
 
-            if !model.transcript.isEmpty {
+            if model.state == .preview, !model.transcript.isEmpty {
                 TextEditor(text: $model.transcript)
                     .font(.system(size: 12, weight: .regular, design: .rounded))
                     .scrollContentBackground(.hidden)
@@ -300,7 +314,7 @@ struct OverlayContent: View {
                 .foregroundStyle(MurmurStyle.muted)
         }
         .padding(20)
-        .frame(width: 410, height: model.transcript.isEmpty ? 238 : 320)
+        .frame(width: 410, height: model.state == .preview && !model.transcript.isEmpty ? 320 : 238)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(LinearGradient(colors: [Color(red: 0.07, green: 0.11, blue: 0.16), MurmurStyle.background], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -340,25 +354,20 @@ private struct Keycap: View {
 }
 
 private struct WaveformView: View {
+    let levels: [Float]
     let isActive: Bool
-    private let levels: [CGFloat] = [0.18, 0.30, 0.22, 0.55, 0.34, 0.75, 0.40, 0.25, 0.66, 0.31, 0.86, 0.44, 0.27, 0.63, 0.35, 0.72, 0.30, 0.55, 0.24, 0.43, 0.20]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !isActive)) { timeline in
-            HStack(spacing: 4) {
-                ForEach(levels.indices, id: \.self) { index in
-                    let phase = timeline.date.timeIntervalSinceReferenceDate * 5.0 + Double(index) * 0.72
-                    let animatedLevel = 0.14 + 0.86 * abs(sin(phase))
-                    let level = isActive ? animatedLevel : Double(levels[index])
-                    Capsule()
-                        .fill(LinearGradient(colors: [MurmurStyle.mint, MurmurStyle.blue], startPoint: .top, endPoint: .bottom))
-                        .frame(width: 3, height: max(5, CGFloat(level) * 36))
-                        .opacity(isActive ? 0.96 : 0.62)
-                }
+        HStack(spacing: 4) {
+            ForEach(levels.indices, id: \.self) { index in
+                Capsule()
+                    .fill(LinearGradient(colors: [MurmurStyle.mint, MurmurStyle.blue], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 3, height: 3 + CGFloat(levels[index]) * 33)
+                    .opacity(isActive ? 0.96 : 0.62)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityHidden(true)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel(isActive ? "Mikrofonpegel der letzten Sekunde" : "Mikrofon inaktiv")
     }
 }
 

@@ -15,6 +15,7 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio")
             ],
             path: "Sources/MurmurApp"
-        )
+        ),
+        .testTarget(name: "MurmurAppTests", dependencies: ["MurmurApp"])
     ]
 )

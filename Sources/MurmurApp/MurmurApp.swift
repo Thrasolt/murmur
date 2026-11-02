@@ -32,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        model?.cancel()
+    }
+
     func connect(model: MurmurModel) {
         guard self.model == nil else { return }
         self.model = model

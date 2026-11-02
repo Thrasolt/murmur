@@ -53,6 +53,12 @@ swift build
 
 Alternativ kannst du die Aufnahme über die Schaltfläche im Menüleistenfenster manuell starten und beenden. Wenn automatisches Einfügen nicht klappt, zeigt Murmur eine Textvorschau mit **Kopieren** und **Erneut einfügen**.
 
+Murmur merkt sich bei jedem Diktat das fokussierte Eingabefeld, auch in Formularen mit mehreren Feldern. Vor dem Einfügen wird das Aufnahmefenster ausgeblendet und bei Bedarf der Fokus auf das ursprüngliche Feld zurückgesetzt. Ist ein erfasstes Feld nicht mehr erreichbar, bleibt der Text in der Vorschau. Editoren ohne zugängliches Bedienungshilfen-Feld verwenden weiterhin das Einfügen über die Ziel-App.
+
+Die Wellenform zeigt während der Aufnahme den tatsächlichen Mikrofonpegel der letzten rund 0,7 Sekunden. Neue Messwerte erscheinen rechts. Bei Stille läuft der Verlauf zur flachen Linie aus; leises Grundrauschen unter −50 dBFS wird ausgeblendet.
+
+Zum Beenden öffnest du Murmur über die Menüleiste und klickst unten auf **Murmur beenden**. Bei geöffnetem Murmur-Menü funktioniert auch **⌘Q**.
+
 ## Datenschutz
 
 - Audioaufnahme und Spracherkennung laufen lokal auf dem Mac. Audio und Transkript werden nicht an einen Transkriptionsdienst gesendet.
